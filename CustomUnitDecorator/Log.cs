@@ -17,7 +17,6 @@ namespace CustomUnitDecorator {
     public static void flushThreadProc() {
       while (Log.flushThreadActive == true) {
         Thread.Sleep(10 * 1000);
-        Log.LogWrite("flush\n");
         Log.flush();
       }
     }

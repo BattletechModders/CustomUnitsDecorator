@@ -213,7 +213,7 @@ namespace CustomUnitDecorator {
   [HarmonyPatch("DependenciesLoaded")]
   [HarmonyPatch(MethodType.Normal)]
   [HarmonyPatch(new Type[] { typeof(uint) })]
-  public static class PilotDef_DependenciesLoaded {
+  public static class MechComponentDef_DependenciesLoaded {
     public static void Postfix(MechComponentDef __instance, uint loadWeight, ref bool __result) {
       try {
         if (__result == false) { return; }
@@ -230,7 +230,7 @@ namespace CustomUnitDecorator {
   [HarmonyPatch("GatherDependencies")]
   [HarmonyPatch(MethodType.Normal)]
   [HarmonyPatch(new Type[] { typeof(DataManager), typeof(DataManager.DependencyLoadRequest), typeof(uint) })]
-  public static class PilotDef_GatherDependencies {
+  public static class MechComponentDef_GatherDependencies {
     public static void Postfix(MechComponentDef __instance, DataManager dataManager, DataManager.DependencyLoadRequest dependencyLoad, uint activeRequestWeight) {
       try {
         DecoratorComponent decoration = __instance.GetComponent<DecoratorComponent>();
