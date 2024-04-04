@@ -48,6 +48,9 @@
     <Reference Include="CustomComponents">
       <HintPath>$(BattleTechGameDir)\Mods\Core\CustomComponents\CustomComponents.dll</HintPath>
     </Reference>
+    <Reference Include="IRBTModUtils">
+      <HintPath>..\..\..\Mods\Core\IRBTModUtils\IRBTModUtils.dll</HintPath>
+    </Reference>
     <Reference Include="Newtonsoft.Json">
       <HintPath>$(BattleTechGameDir)\BattleTech_Data\Managed\Newtonsoft.Json.dll</HintPath>
     </Reference>

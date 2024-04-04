@@ -5,12 +5,14 @@ using BattleTech.UI.TMProWrapper;
 using BattleTech.UI.Tooltips;
 using CustomComponents;
 using HarmonyLib;
+using IRBTModUtils;
 using Localize;
 using SVGImporter;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace CustomUnitDecorator {
   [CustomComponent("DecoratorComponent", true)]
@@ -189,6 +191,50 @@ namespace CustomUnitDecorator {
       }
     }
   }
+  public static class GifAnimatorHelper {
+    public static GifSpriteAnimator AddGitSprite(this Image img, string id, bool alwaysAnimate) {
+      GifSpriteAnimator gifSpriteAnimator = null;
+      try {
+        if (img == null) { return null; }
+        if (string.IsNullOrEmpty(id)) { return null; }
+        gifSpriteAnimator = img.gameObject.GetComponent<GifSpriteAnimator>();
+        if (gifSpriteAnimator == null) {
+          gifSpriteAnimator = img.gameObject.AddComponent<GifSpriteAnimator>();
+          gifSpriteAnimator.portrait = img;
+        }
+        gifSpriteAnimator.gif = null;
+        gifSpriteAnimator.alwaysAnimate = false;
+        gifSpriteAnimator.hovered = false;
+        string animate_id = id + Core.ANIMATED_ICON_SUFFIX;
+        gifSpriteAnimator.gif = GifStorageHelper.GetSprites(animate_id);
+        Log.WL(0, $"AddGitSprite:{animate_id} {(gifSpriteAnimator.gif == null ? "not exists" : "exists")}");
+        if ((gifSpriteAnimator.gif == null) && (Core.HOVER_SPRITE != null)) { gifSpriteAnimator.gif = Core.HOVER_SPRITE; }
+        if (gifSpriteAnimator.gif != null) {
+          gifSpriteAnimator.origSprite = img.sprite;
+        } else {
+          gifSpriteAnimator.origSprite = null;
+          gifSpriteAnimator.gif = GifStorageHelper.GetSprites(id);
+        }
+        gifSpriteAnimator.Reset();
+        gifSpriteAnimator.OnUnhover();
+        gifSpriteAnimator.alwaysAnimate = alwaysAnimate;
+      }catch(Exception e) {
+        Log.TWL(0, e.ToString());
+        UIManager.logger.LogException(e);
+      }
+      Log.WL(1, $" success");
+      return gifSpriteAnimator;
+    }
+    public static void AddGitSpriteHover(this Image img, GameObject hoverCarrier, string id, bool alwaysAnimate) {
+      if (img == null) { return; }
+      var gifSpriteAnimator = img.AddGitSprite(id, alwaysAnimate);
+      if (gifSpriteAnimator == null) { return; }
+      if (hoverCarrier == null) { return; }
+      GifSpriteAnimatorHover hover = hoverCarrier.GetComponent<GifSpriteAnimatorHover>();
+      if (hover == null) { hover = hoverCarrier.AddComponent<GifSpriteAnimatorHover>(); }
+      hover.imageAnimator = gifSpriteAnimator;
+    }
+  }
   [HarmonyPatch(typeof(MechBayMechUnitElement))]
   [HarmonyPatch("SetAlertIcon")]
   [HarmonyPatch(MethodType.Normal)]
@@ -209,6 +255,37 @@ namespace CustomUnitDecorator {
       }
     }
   }
+  //[HarmonyPatch(typeof(MechBayMechUnitElement))]
+  //[HarmonyPatch("SetLabel")]
+  //[HarmonyPatch(MethodType.Normal)]
+  //[HarmonyPatch(new Type[] { typeof(bool) })]
+  //public static class MechBayMechUnitElement_SetLabel {
+  //  public static void Postfix(MechBayMechUnitElement __instance) {
+  //    try {
+  //      Log.TWL(0, $"MechBayMechUnitElement.SetLabel {(__instance.mechDef == null ? "null" : __instance.mechDef.ChassisID)}");
+  //      if (__instance.mechDef == null) { return; }
+  //      if (Core.HOVER_SPRITE == null) { return; }
+  //      if (__instance.mechImage != null) {
+  //        GifSpriteAnimator gifSpriteAnimator = __instance.mechImage.gameObject.GetComponent<GifSpriteAnimator>();
+  //        if (gifSpriteAnimator == null) {
+  //          gifSpriteAnimator = __instance.mechImage.gameObject.AddComponent<GifSpriteAnimator>();
+  //        }
+  //        gifSpriteAnimator.portrait = __instance.mechImage;
+  //        //gifSpriteAnimator.gif = null;
+  //        //if (__instance.mechDef != null) {
+  //          gifSpriteAnimator.gif = Core.HOVER_SPRITE;
+  //        //}
+  //        gifSpriteAnimator.Reset();
+  //        Log.WL(1, "gifSpriteAnimator.gif: " + (gifSpriteAnimator.gif == null ? "null" : "not null"));
+  //        SlotHover hover = __instance.MechTooltip.gameObject.GetComponent<SlotHover>();
+  //        if (hover == null) { hover = __instance.MechTooltip.gameObject.AddComponent<SlotHover>(); }
+  //        hover.animator = gifSpriteAnimator;
+  //      }
+  //    } catch (Exception e) {
+  //      Log.TWL(0, e.ToString(), true);
+  //    }
+  //  }
+  //}
   [HarmonyPatch(typeof(MechComponentDef))]
   [HarmonyPatch("DependenciesLoaded")]
   [HarmonyPatch(MethodType.Normal)]
@@ -293,7 +370,246 @@ namespace CustomUnitDecorator {
       try {
         if (data is MechDef mechDef) {
           __instance.WeightField.SetText("(Class:{0}) <b>({1}:{2}K)</b>", mechDef.Chassis.weightClass,Strings.CurrentCulture == Strings.Culture.CULTURE_RU_RU?"Цен.":"Cost", mechDef.CalculateMechCost().ToString("N0"));
+          __instance.PNGImage.AddGitSprite(mechDef.Chassis.Description.Icon, true);
         }
+      } catch (Exception e) {
+        Log.TWL(0, e.ToString(), true);
+      }
+    }
+  }
+  //[HarmonyPatch(typeof(InventoryDataObject_SalvageFullMech))]
+  //[HarmonyPatch("RefreshInfoOnWidget")]
+  //[HarmonyPatch(MethodType.Normal)]
+  //public static class InventoryDataObject_SalvageFullMech_RefreshInfoOnWidget {
+  //  public static void Postfix(InventoryDataObject_SalvageFullMech __instance, InventoryItemElement theWidget) {
+  //    try {
+  //      Log.TWL(0, "InventoryDataObject_SalvageFullMech.RefreshInfoOnWidget");
+  //      if (__instance.mechDef != null) {
+  //        theWidget.iconMech.AddGitSprite(__instance.mechDef.Description.Icon, false);
+  //      }
+  //    } catch (Exception e) {
+  //      Log.TWL(0, e.ToString(), true);
+  //    }
+  //  }
+  //}
+  //[HarmonyPatch(typeof(InventoryDataObject_ShopFullMech))]
+  //[HarmonyPatch("RefreshInfoOnWidget")]
+  //[HarmonyPatch(MethodType.Normal)]
+  //public static class InventoryDataObject_ShopFullMech_RefreshInfoOnWidget {
+  //  public static void Postfix(InventoryDataObject_ShopFullMech __instance, InventoryItemElement theWidget) {
+  //    try {
+  //      Log.TWL(0, "InventoryDataObject_ShopFullMech.RefreshInfoOnWidget");
+  //      if (__instance.mechDef != null) {
+  //        theWidget.iconMech.AddGitSprite(__instance.mechDef.Description.Icon, false);
+  //      }
+  //    } catch (Exception e) {
+  //      Log.TWL(0, e.ToString(), true);
+  //    }
+  //  }
+  //}
+  [HarmonyPatch(typeof(LanceMechSlot))]
+  [HarmonyPatch("Init")]
+  [HarmonyPatch(MethodType.Normal)]
+  public static class LanceMechSlot_Init {
+    public static void Postfix(LanceMechSlot __instance, MechDef mechDef, LanceConfigurator LC, int availableCBills, bool inSelectionList, bool isFavorite, OnMechSlotSelected mechCB = null) {
+      try {
+        Log.TWL(0, "LanceMechSlot.Init");
+        if (__instance.curMech != null) {
+          __instance.mechImage.AddGitSprite(__instance.curMech.Chassis.Description.Icon, false);
+        }
+      } catch (Exception e) {
+        Log.TWL(0, e.ToString(), true);
+      }
+    }
+  }
+  [HarmonyPatch(typeof(LanceMechSlot))]
+  [HarmonyPatch("SetRandomOverlay")]
+  [HarmonyPatch(MethodType.Normal)]
+  public static class LanceMechSlot_SetRandomOverlay {
+    public static void Postfix(LanceMechSlot __instance, bool isRandom) {
+      try {
+        Log.TWL(0, "LanceMechSlot.SetRandomOverlay");
+        if (isRandom == false) { return; }
+        if (__instance.mechImage != null) {
+          GifSpriteAnimator gifSpriteAnimator = __instance.mechImage.gameObject.GetComponent<GifSpriteAnimator>();
+          if (gifSpriteAnimator == null) {
+            gifSpriteAnimator = __instance.mechImage.gameObject.AddComponent<GifSpriteAnimator>();
+            gifSpriteAnimator.portrait = __instance.mechImage;
+          }
+          gifSpriteAnimator.gif = null;
+          gifSpriteAnimator.Reset();
+          Log.WL(1, "gifSpriteAnimator.gif: " + (gifSpriteAnimator.gif == null ? "null" : "not null"));
+        }
+      } catch (Exception e) {
+        Log.TWL(0, e.ToString(), true);
+      }
+    }
+  }
+  //[HarmonyPatch(typeof(ListElementController_SalvageFullMech_NotListView))]
+  //[HarmonyPatch("RefreshInfoOnWidget")]
+  //[HarmonyPatch(MethodType.Normal)]
+  //public static class ListElementController_SalvageFullMech_NotListView_RefreshInfoOnWidget {
+  //  public static void Postfix(ListElementController_SalvageFullMech_NotListView __instance, InventoryItemElement theWidget) {
+  //    try {
+  //      Log.TWL(0, "ListElementController_SalvageFullMech_NotListView.RefreshInfoOnWidget");
+  //      if (__instance.mechDef != null) {
+  //        theWidget.iconMech.AddGitSprite(__instance.mechDef.Description.Icon, false);
+  //      }
+  //    } catch (Exception e) {
+  //      Log.TWL(0, e.ToString(), true);
+  //    }
+  //  }
+  //}
+  [HarmonyPatch(typeof(MechBayMechUnitElement))]
+  [HarmonyPatch("SetData")]
+  [HarmonyPatch(MethodType.Normal)]
+  [HarmonyPatch(new Type[] { typeof(IMechLabDropTarget), typeof(DataManager), typeof(int), typeof(MechDef), typeof(bool), typeof(bool), typeof(bool), typeof(bool), typeof(bool), typeof(bool) })]
+  public static class MechBayMechUnitElement_SetData_Gif {
+    public static void Postfix(MechBayMechUnitElement __instance, IMechLabDropTarget dropParent, DataManager dataManager, int baySlot, MechDef mechDef, bool inMaintenance, bool isFieldable, bool hasFieldableWarnings, bool allowInteraction, bool blockRaycast, bool buttonEnabled) {
+      try {
+        Log.TWL(0, "MechBayMechUnitElement.SetData");
+        if(__instance.chassisDef != null) {
+          __instance.mechImage.AddGitSpriteHover(__instance.MechTooltip.gameObject, __instance.chassisDef.Description.Icon, false);
+        }
+      } catch (Exception e) {
+        Log.TWL(0, e.ToString(), true);
+      }
+    }
+  }
+  [HarmonyPatch(typeof(MechBayMechUnitElement))]
+  [HarmonyPatch("SetData")]
+  [HarmonyPatch(MethodType.Normal)]
+  [HarmonyPatch(new Type[] { typeof(IMechLabDropTarget), typeof(DataManager), typeof(int), typeof(ChassisDef), typeof(bool), typeof(bool) })]
+  public static class MechBayMechUnitElement_SetData_Gif2 {
+    public static void Postfix(MechBayMechUnitElement __instance, IMechLabDropTarget dropParent, DataManager dataManager, int baySlot, ChassisDef chassisDef, bool inMaintenance, bool allowDrag) {
+      try {
+        Log.TWL(0, "MechBayMechUnitElement.SetData");
+        if (__instance.chassisDef != null) {
+          __instance.mechImage.AddGitSpriteHover(__instance.MechTooltip.gameObject, __instance.chassisDef.Description.Icon, false);
+        }
+      } catch (Exception e) {
+        Log.TWL(0, e.ToString(), true);
+      }
+    }
+  }
+  [HarmonyPatch(typeof(MechUnitElementWidget))]
+  [HarmonyPatch("SetIcon")]
+  [HarmonyPatch(MethodType.Normal)]
+  [HarmonyPatch(new Type[] { typeof(string) })]
+  public static class MechUnitElementWidget_SetIcon {
+    public static void Postfix(MechUnitElementWidget __instance, string icon) {
+      try {
+        Log.TWL(0, "MechUnitElementWidget.SetIcon");
+        __instance.mechIcon.AddGitSpriteHover(__instance.MechTooltip?.gameObject, icon, false);
+      } catch (Exception e) {
+        Log.TWL(0, e.ToString(), true);
+      }
+    }
+  }
+  [HarmonyPatch(typeof(LanceLoadoutMechItem))]
+  [HarmonyPatch("SetData")]
+  [HarmonyPatch(MethodType.Normal)]
+  public static class LanceLoadoutMechItem_SetData {
+    public static void Postfix(LanceLoadoutMechItem __instance) {
+      try {
+        Log.TWL(0, "LanceLoadoutMechItem.SetData");
+        GifSpriteAnimator gifSpriteAnimator = __instance.mechElement.gameObject.GetComponentInChildren<GifSpriteAnimator>(true);
+        if((gifSpriteAnimator != null) && (__instance.MechTooltip != null)) {
+          GifSpriteAnimatorHover hover = __instance.MechTooltip.gameObject.GetComponent<GifSpriteAnimatorHover>();
+          if (hover == null) { hover = __instance.MechTooltip.gameObject.AddComponent<GifSpriteAnimatorHover>(); }
+          hover.imageAnimator = gifSpriteAnimator;
+        }
+      } catch (Exception e) {
+        Log.TWL(0, e.ToString(), true);
+      }
+    }
+  }
+  [HarmonyPatch(typeof(TooltipPrefab_Chassis))]
+  [HarmonyPatch("SetData")]
+  [HarmonyPatch(MethodType.Normal)]
+  public static class TooltipPrefab_Chassis_SetData {
+    public static void Postfix(TooltipPrefab_Chassis __instance, object data) {
+      try {
+        Log.TWL(0, "TooltipPrefab_Chassis.SetData");
+        if (data is ChassisDef chassisDef) {
+          __instance.PNGImage.AddGitSprite(chassisDef.Description.Icon, true);
+        }
+      } catch (Exception e) {
+        Log.TWL(0, e.ToString(), true);
+      }
+    }
+  }
+  [HarmonyPatch(typeof(MechDef))]
+  [HarmonyPatch("DependenciesLoaded")]
+  [HarmonyPatch(MethodType.Normal)]
+  [HarmonyPatch(new Type[] { typeof(uint) })]
+  public static class MechDef_DependenciesLoaded {
+    public static void Postfix(MechDef __instance, uint loadWeight, ref bool __result) {
+      try {
+        Log.TWL(0, "MechDef.DependenciesLoaded " + __instance.Description.Id);
+        if (__result == false) { return; }
+        if (__instance.dataManager == null) { return; }
+        if (string.IsNullOrEmpty(__instance.Description.Icon)) { return; }
+        string animated_icon = __instance.Description.Icon + Core.ANIMATED_ICON_SUFFIX;
+        if (__instance.dataManager.ResourceLocator.EntryByID(animated_icon, BattleTechResourceType.Sprite) == null) { return; }
+        if (GifStorageHelper.GetSprites(animated_icon) != null) { return; }
+        __result = false;
+      } catch (Exception e) {
+        Log.TWL(0, e.ToString(), true);
+      }
+    }
+  }
+  [HarmonyPatch(typeof(MechDef))]
+  [HarmonyPatch("GatherDependencies")]
+  [HarmonyPatch(MethodType.Normal)]
+  [HarmonyPatch(new Type[] { typeof(DataManager), typeof(DataManager.DependencyLoadRequest), typeof(uint) })]
+  public static class MechDef_GatherDependencies {
+    public static void Postfix(MechDef __instance, DataManager dataManager, DataManager.DependencyLoadRequest dependencyLoad, uint activeRequestWeight) {
+      try {
+        Log.TWL(0, "MechDef.GatherDependencies " + __instance.Description.Id);
+        if (string.IsNullOrEmpty(__instance.Description.Icon)) { return; }
+        string animated_icon = __instance.Description.Icon + Core.ANIMATED_ICON_SUFFIX;
+        if (dataManager.ResourceLocator.EntryByID(animated_icon, BattleTechResourceType.Sprite) == null) { return; }
+        if (GifStorageHelper.GetSprites(animated_icon) != null) { return; }
+        dependencyLoad.RequestResource(BattleTechResourceType.Sprite, animated_icon);
+      } catch (Exception e) {
+        Log.TWL(0, e.ToString(), true);
+      }
+    }
+  }
+  [HarmonyPatch(typeof(ChassisDef))]
+  [HarmonyPatch("DependenciesLoaded")]
+  [HarmonyPatch(MethodType.Normal)]
+  [HarmonyPatch(new Type[] { typeof(uint) })]
+  public static class ChassisDef_DependenciesLoaded {
+    public static void Postfix(ChassisDef __instance, uint loadWeight, ref bool __result) {
+      try {
+        Log.TWL(0, "MechDef.DependenciesLoaded " + __instance.Description.Id);
+        if (__result == false) { return; }
+        if (__instance.dataManager == null) { return; }
+        if (string.IsNullOrEmpty(__instance.Description.Icon)) { return; }
+        string animated_icon = __instance.Description.Icon + Core.ANIMATED_ICON_SUFFIX;
+        if (__instance.dataManager.ResourceLocator.EntryByID(animated_icon, BattleTechResourceType.Sprite) == null) { return; }
+        if (GifStorageHelper.GetSprites(animated_icon) != null) { return; }
+        __result = false;
+      } catch (Exception e) {
+        Log.TWL(0, e.ToString(), true);
+      }
+    }
+  }
+  [HarmonyPatch(typeof(ChassisDef))]
+  [HarmonyPatch("GatherDependencies")]
+  [HarmonyPatch(MethodType.Normal)]
+  [HarmonyPatch(new Type[] { typeof(DataManager), typeof(DataManager.DependencyLoadRequest), typeof(uint) })]
+  public static class ChassisDef_GatherDependencies {
+    public static void Postfix(ChassisDef __instance, DataManager dataManager, DataManager.DependencyLoadRequest dependencyLoad, uint activeRequestWeight) {
+      try {
+        Log.TWL(0, "MechDef.GatherDependencies " + __instance.Description.Id);
+        if (string.IsNullOrEmpty(__instance.Description.Icon)) { return; }
+        string animated_icon = __instance.Description.Icon + Core.ANIMATED_ICON_SUFFIX;
+        if (dataManager.ResourceLocator.EntryByID(animated_icon, BattleTechResourceType.Sprite) == null) { return; }
+        if (GifStorageHelper.GetSprites(animated_icon) != null) { return; }
+        dependencyLoad.RequestResource(BattleTechResourceType.Sprite, animated_icon);
       } catch (Exception e) {
         Log.TWL(0, e.ToString(), true);
       }
